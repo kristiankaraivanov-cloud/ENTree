@@ -39,7 +39,7 @@ function startScan(chosen, options = {}) {
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   const verifying = process.argv.includes('--verify');
-  window = new BrowserWindow({ width: verifying ? 1672 : 1440, height: verifying ? 943 : 860, useContentSize: true, show: !verifying, minWidth: 860, minHeight: 620, frame: false, title: 'ENTree', backgroundColor: '#f5f7f9', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  window = new BrowserWindow({ width: verifying ? 1672 : 1440, height: verifying ? 943 : 860, useContentSize: true, show: !verifying, minWidth: 860, minHeight: 620, frame: false, title: 'ENTree', backgroundColor: '#130922', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));

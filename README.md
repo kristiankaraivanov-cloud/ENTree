@@ -27,14 +27,19 @@ The app opens with **clearly labeled sample data**. Click **Open folder** to cho
 
 Click **Settings** to adjust:
 
-- Reference light, Forest dark, or the system theme
+- Aurora violet (default), Eclipse, Reference light, Forest dark, or the system theme
 - Any accent color
 - Interface size, 85–120%
 - Tile spacing and nesting depth
-- Reference, Forest, Ocean, or monochrome colors
+- Ocean + Aurora, Eclipse ember, Reference, Forest, Ocean, or monochrome colors
 - Folder labels and dot-prefixed entries
 
-Appearance updates immediately and persists locally. The dot-entry setting applies on the next scan. Reset defaults restores the original design.
+Appearance updates immediately and persists locally. The dot-entry setting applies on the next scan. Reset defaults restores the Ocean + Aurora palette over the violet background. The Eclipse theme update applies once to existing installations while retaining interface size and scan preferences; later appearance choices remain saved.
+
+## Quick scan tools
+
+- **Largest files** switches to the 25 largest files in the current scan. Search still narrows the results; the tree map remains available in Tree View.
+- **Export summary** saves a JSON report with scan totals, category sizes, volume capacity, and the 25 largest files. Demo reports are explicitly labeled as sample data, not a live PC scan. The export is created locally and is not uploaded by ENTree.
 
 ## Review and recycle
 

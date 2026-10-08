@@ -2,3 +2,66 @@
 .folder-caption .tile-caption{top:50%;transform:translateY(-50%);left:8%;right:7%;max-width:none}.folder-caption.compact .tile-caption{display:block;left:8%;right:4%}.folder-caption.compact .tile-caption img{width:22px;height:22px;margin-bottom:7px}.folder-caption.compact .tile-caption strong{font-size:13px}.folder-caption.compact .tile-caption small{font-size:12px}.folder-caption .tile-caption strong{white-space:nowrap}.tile-caption img{flex-shrink:0}
 .tile.compact .tile-caption{display:block;left:8%;right:5%;top:50%;transform:translateY(-50%);max-width:none}.tile.compact .tile-caption img{width:22px;height:22px;margin-bottom:7px}.tile.compact .tile-caption strong{font-size:13px}.tile.compact .tile-caption small{font-size:12px}
 @media(min-width:1600px){.file-table{font-size:14px}.extension-table td{font-size:13px}}
+
+/* Eclipse: dark disk explorer with restrained solar accents. */
+body.eclipse{--bg:#100f14;--panel:#18161e;--raised:#24212c;--line:#36303e;--text:#f6f0e8;--muted:#b6aab8;--select:#3c2c24;color-scheme:dark}
+body.eclipse .titlebar{background:linear-gradient(110deg,#221923,#100f14 60%,#3e2419);border-bottom:1px solid #63422d;height:43px}
+body.eclipse .app-icon{background:linear-gradient(135deg,#ffd379,#f08b39,#b54334);box-shadow:0 0 14px #ed813324}
+body.eclipse .drivebar{background:#151219;height:63px}
+body.eclipse .drive-select,body.eclipse .search{border-color:var(--line);border-radius:7px}
+body.eclipse button{border-radius:6px}
+body.eclipse .primary{color:#20130b;background:var(--accent);border-color:var(--accent)}
+body.eclipse .tabs{background:#151219;height:39px}
+body.eclipse .tabs>button{height:39px;border-radius:0;color:var(--muted)}
+body.eclipse .tabs>button.active{color:var(--accent);background:#ffb4540c}
+body.eclipse .tab-actions button{height:27px}
+body.eclipse main{padding:9px 10px 10px;gap:10px}
+body.eclipse .analysis-panels{gap:10px}
+body.eclipse .table-scroll{border-radius:7px}
+body.eclipse th{background:#211c27;color:#d2c4d4}
+body.eclipse tbody tr:nth-child(even){background:#1c1922}
+body.eclipse tbody tr:hover{background:#2a222e}
+body.eclipse tbody tr.selected{background:var(--select)}
+body.eclipse .mini-bar,body.eclipse .capacity-track{background:#332b38}
+body.eclipse .mini-bar>div{opacity:.85}
+body.eclipse .capacity-track>div{background:linear-gradient(90deg,#ad4230,var(--accent))}
+body.eclipse .treemap{background:#100e12;border-color:var(--line);border-radius:7px}
+body.eclipse .tile{background:linear-gradient(145deg,#ffffff0d,#00000022),var(--tile);border-color:#100e1266}
+body.eclipse .tile:hover{background:linear-gradient(145deg,#ffffff16,#00000011),var(--tile)}
+body.eclipse .tile.selected{outline-color:#ffd698;box-shadow:inset 0 0 0 5px #27191a}
+body.eclipse .tile-caption{text-shadow:0 1px 3px #000a}
+body.eclipse .statusbar{background:#151219}
+body.eclipse .statusbar>img{filter:invert(77%) sepia(44%) saturate(761%) hue-rotate(334deg)}
+body.eclipse dialog{border-color:#63422d}
+body.eclipse ::-webkit-scrollbar{width:10px;height:10px}
+body.eclipse ::-webkit-scrollbar-track{background:#18161e}
+body.eclipse ::-webkit-scrollbar-thumb{background:#504150;border:2px solid #18161e;border-radius:8px}
+
+/* Ocean + Aurora: cool, high-contrast surfaces over the violet aurora canvas. */
+body.aurora{--bg:#130922;--panel:#1c1230;--raised:#2a1b40;--line:#49335f;--text:#f7f3ff;--muted:#c6b9dc;--select:#243b59;color-scheme:dark;background:linear-gradient(#10091dbb,#10091dbb),url('assets/aurora-violet.png') center/cover no-repeat fixed}
+body.aurora .titlebar{background:linear-gradient(100deg,#1b102bbf,#11152abf 64%,#102c3bbf);border-color:#4b3980}
+body.aurora .app-icon{background:linear-gradient(135deg,#17d9e7,#7654e8 62%,#d54cc7);box-shadow:0 0 17px #28d5e744}
+body.aurora .drivebar,body.aurora .tabs,body.aurora .statusbar{background:#170f29e8;border-color:#413157}
+body.aurora .drive-select,body.aurora .search{background:#171126e8;border-color:#4b3a67}
+body.aurora .primary{color:#061922;background:linear-gradient(100deg,#19d8e5,#56d6ca);border-color:#42e0e3}
+body.aurora .primary:hover{filter:brightness(1.08)}
+body.aurora .tabs>button.active{color:#43e4eb;border-bottom-color:#28dce6}
+body.aurora .table-scroll{background:#191127eF;border-color:#48375e}
+body.aurora td{border-color:#372847}
+body.aurora th{background:#27183bec;color:#e6d8fb;border-color:#48375e}
+body.aurora tbody tr:nth-child(even){background:#211633d9}
+body.aurora tbody tr:hover{background:#2d2850}
+body.aurora tbody tr.selected{background:#1c3b50}
+body.aurora .mini-bar,body.aurora .capacity-track{background:#35264b}
+body.aurora .capacity-track>div{background:linear-gradient(90deg,#18d6e5,#33c7b7 70%,#8c62df)}
+body.aurora .treemap{background:#120b20ed;border-color:#56436e}
+body.aurora .tile{border-color:#10091e9c}
+body.aurora .tile.selected{outline-color:#32e1e7;box-shadow:inset 0 0 0 5px #20cad455}
+body.aurora .tile.marked{outline-color:#e879d4}
+body.aurora .statusbar>img{filter:invert(79%) sepia(74%) saturate(560%) hue-rotate(124deg)}
+body.aurora dialog{background:#1b1230f5;border-color:#61457f}
+body.aurora dialog::backdrop{background:#070411a8}
+body.aurora .setting-row{border-color:#49345f}
+body.aurora .setting-row select{background:#241638;color:var(--text)}
+body.aurora .tabs>button#largest-files.active{color:#d780f1;border-bottom-color:#bd6ce8}
+@media(max-width:1200px){body.aurora .tab-actions{max-width:52vw;overflow-x:auto;flex-wrap:nowrap}body.aurora .tabs>button{padding-left:9px;padding-right:9px}}
