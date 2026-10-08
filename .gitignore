@@ -1,0 +1,9 @@
+node_modules/
+dist/
+output/
+.playwright-cli/
+*.log
+.env*
+!.env.example
+docs/native-scan.png
+docs/showcase-before.jpg

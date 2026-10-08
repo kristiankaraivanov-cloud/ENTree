@@ -1,0 +1,26 @@
+{
+  "name": "entree",
+  "productName": "ENTree",
+  "version": "0.1.0",
+  "description": "A personal, local-first disk explorer with an adjustable treemap interface.",
+  "license": "MIT",
+  "main": "src/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "preview": "node scripts/preview.cjs",
+    "test": "node --test test/*.test.cjs",
+    "check": "node --check src/main.cjs && node --check src/scanner.cjs && node --check src/app.js",
+    "package": "electron-packager . ENTree --out=dist --overwrite --ignore=^/test --ignore=^/docs --ignore=^/output"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "@phosphor-icons/core": "2.1.1",
+    "electron": "44.7.0"
+  },
+  "dependencies": {
+    "koffi": "3.3.2"
+  }
+}

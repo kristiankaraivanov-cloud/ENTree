@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "platform": "win32",
+  "nativeScan": true,
+  "allocatedBytes": true,
+  "settingsPersistence": true,
+  "search": true,
+  "review": true,
+  "zoom": true,
+  "rootProtection": true
+}
