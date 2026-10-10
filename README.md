@@ -2,8 +2,6 @@
 
 **Your disk, in detail.** A local desktop disk explorer with a nested treemap and a workspace you can make your own.
 
-![ENtree light interface](docs/showcase.png)
-
 ENTree is an independent implementation inspired by [tobi/disktree](https://github.com/tobi/disktree). It shares the treemap/navigation/review concept, with original application code and styling. Its light interface follows a user-provided Disk Explorer visual reference; the Settings button includes a personalized forest theme. No upstream code or artwork is bundled. UI icons are [Phosphor Icons](https://github.com/phosphor-icons/core), MIT licensed; their license is included in `src/icons/LICENSE`.
 
 ## Run
@@ -19,7 +17,7 @@ npm ci
 npm start
 ```
 
-The app opens with **clearly labeled sample data**. Click **Open folder** to choose a real folder, or select a detected drive and press **Scan**. A background worker scans without reading file contents. Click a tile or table row to select; right-click or press **Details** for its information and review actions. Double-click a directory to explore. Use breadcrumbs or Up to return.
+The desktop app detects local disks, displays their actual used/free/total capacity, and automatically starts scanning the system drive on launch. It does not generate sample files or invented capacity values. Select another drive and click **Scan**, or use **Open folder** to choose a real folder. **All local disks** in the footer sums the capacity and free space of detected local logical drives. A background worker reads file metadata without reading file contents. Click a tile or table row to select; right-click or press **Details** for its information and review actions. Double-click a directory to explore. Use breadcrumbs or Up to return.
 
 **Tree View** expands and collapses folders. **File View** lists files beneath the current folder. Click table headings to sort by name, size, allocation, file/folder counts, or modification time. Search filters paths; the extension table shows file-type totals and percentages. Click an extension to filter to that file type. The colored nested treemap shows apparent size, with zoom and Fit controls at the bottom. Large tables show at most 1,500 rows; narrow your search to find a specific item.
 
@@ -33,13 +31,14 @@ Click **Settings** to adjust:
 - Tile spacing and nesting depth
 - Ocean + Aurora, Eclipse ember, Reference, Forest, Ocean, or monochrome colors
 - Folder labels and dot-prefixed entries
+- Scan entry limit: 250,000, 500,000 or 1,000,000 entries (higher limits take longer and use more memory)
 
 Appearance updates immediately and persists locally. The dot-entry setting applies on the next scan. Reset defaults restores the Ocean + Aurora palette over the violet background. The Eclipse theme update applies once to existing installations while retaining interface size and scan preferences; later appearance choices remain saved.
 
 ## Quick scan tools
 
 - **Largest files** switches to the 25 largest files in the current scan. Search still narrows the results; the tree map remains available in Tree View.
-- **Export summary** saves a JSON report with scan totals, category sizes, volume capacity, and the 25 largest files. Demo reports are explicitly labeled as sample data, not a live PC scan. The export is created locally and is not uploaded by ENTree.
+- **Export summary** saves a JSON report with scanned file totals, category sizes, live local disk capacity, and the 25 largest files. The export is created locally and is not uploaded by ENTree.
 
 ## Review and recycle
 
@@ -54,7 +53,7 @@ Roots, home directories, system locations, other user profiles, paths outside th
 - Hard links are counted once per scan. Ownership is attributed to the first encountered link.
 - Symlinks, Windows junctions, and mount boundaries with a different device ID are skipped.
 - Windows hidden attributes are not filtered; the optional hidden filter covers dot-prefixed names only.
-- Unreadable paths are reported; limits of 250,000 entries and 256 directory levels produce an explicitly partial result. Canceled scans disable native actions until a new scan succeeds.
+- Unreadable paths are reported; the adjustable entry limit (250,000 by default) and 256 directory levels produce an explicitly partial result. A partial scan is never presented as a complete disk inventory. Large drives can exceed the default limit; raise it in Settings and rescan if needed. Capacity figures still come from Windows/the filesystem and are independent of the file inventory. Canceled scans clear the old view and disable native actions until a new scan succeeds.
 - Folder recycling checks identity and path components before confirmation and immediately before execution. OS filesystem changes can still race a recycle operation. This is an initial release, not a replacement for backups.
 - No administrator elevation, NTFS MFT scan, Git status probing, network access, telemetry, or automatic cleanup.
 
@@ -63,11 +62,11 @@ Roots, home directories, system locations, other user profiles, paths outside th
 ```sh
 npm test
 npm run check
-npm run preview    # http://127.0.0.1:4173 — sample data only
+npm run preview    # http://127.0.0.1:4173 — desktop app required for scanning
 npm run package    # current-platform portable app in dist/
 ```
 
-The browser preview is a demo only; native folder access and recycling require the desktop app. Koffi is the sole application dependency and supports Windows allocated-size queries. Electron, packaging tools and the icon source are development dependencies. Vendored icons need no runtime dependency. No CDN or remote font is used.
+The browser preview shows only the empty app shell; native folder access and recycling require the desktop app. Koffi is the sole application dependency and supports Windows allocated-size queries. Electron, packaging tools and the icon source are development dependencies. Vendored icons need no runtime dependency. No CDN or remote font is used.
 
 | File | Responsibility |
 | --- | --- |

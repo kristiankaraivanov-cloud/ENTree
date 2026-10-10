@@ -5,9 +5,9 @@ final result: passed
 ## Evidence
 
 - Source: user-provided Disk Explorer reference, 1672 × 941 pixels.
-- Final native desktop capture: `docs/showcase.png`, 1672 × 943 pixels, scale factor 1. Source height normalized by two pixels for the combined comparison.
+- Historical native design capture: `docs/showcase.png`, 1672 × 943 pixels, scale factor 1. It used sample data during the original visual comparison; the current app starts with live disk data.
 - Source and final capture were opened together in a vertical comparison. The toolbar, tables, selected row, treemap labels, status footer and settings were inspected at readable size.
-- `docs/settings.png` and `docs/forest-dark.png` show the requested customization controls and personal theme.
+- `docs/settings.png` and `docs/forest-dark.png` are historical customization previews with sample data. They do not represent a live PC scan.
 
 ## Findings and fixes
 

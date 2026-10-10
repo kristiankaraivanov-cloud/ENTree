@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('entree', {
   drives: () => ipcRenderer.invoke('drives'),
+  startupRoot: () => ipcRenderer.invoke('startup-root'),
   windowControl: action => ipcRenderer.invoke('window-control', action),
   chooseFolder: () => ipcRenderer.invoke('choose-folder'),
   scan: (root, options) => ipcRenderer.invoke('scan', root, options),

@@ -17,7 +17,8 @@ function startScan(chosen, options = {}) {
   if (busy) throw new Error('Wait for the recycle operation to finish.');
   if (worker) worker.terminate();
   manifest.clear(); scanResult = null;
-  const current = new Worker(path.join(__dirname, 'scanner.cjs'), { workerData: { root: chosen, options: { hidden: options.hidden !== false } } });
+  const maxEntries = [250000, 500000, 1000000].includes(options.maxEntries) ? options.maxEntries : 250000;
+  const current = new Worker(path.join(__dirname, 'scanner.cjs'), { workerData: { root: chosen, options: { hidden: options.hidden !== false, maxEntries } } });
   worker = current;
   current.on('message', msg => {
     if (worker !== current || window.isDestroyed()) return;
@@ -46,11 +47,19 @@ app.whenReady().then(() => {
   ipcMain.handle('window-control', (event, action) => { trusted(event); if (action === 'minimize') window.minimize(); else if (action === 'maximize') window.isMaximized() ? window.unmaximize() : window.maximize(); else if (action === 'close') window.close(); });
   ipcMain.handle('drives', event => {
     trusted(event);
-    if (process.platform !== 'win32') return [{ path: path.parse(os.homedir()).root, label: 'Filesystem' }, { path: os.homedir(), label: 'Home folder' }];
-    return new Promise(resolve => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | Select-Object DeviceID,VolumeName | ConvertTo-Json -Compress'], { windowsHide: true, timeout: 10000 }, (error, output) => {
-      if (error) { resolve([{ path: path.parse(os.homedir()).root, label: 'Local Disk' }]); return; }
-      try { const data = JSON.parse(output); resolve([].concat(data).filter(Boolean).map(d => ({ path: `${d.DeviceID}\\`, label: `${d.VolumeName || 'Local Disk'} (${d.DeviceID})` }))); } catch { resolve([{ path: path.parse(os.homedir()).root, label: 'Local Disk' }]); }
+    const fallback = () => { const root = path.parse(os.homedir()).root; try { const v = fs.statfsSync(root); return [{ path: root, label: 'Local Disk', total: v.blocks * v.bsize, free: v.bavail * v.bsize }]; } catch { return [{ path: root, label: 'Local Disk', total: null, free: null }]; } };
+    if (process.platform !== 'win32') return fallback();
+    return new Promise(resolve => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | Select-Object DeviceID,VolumeName,Size,FreeSpace | ConvertTo-Json -Compress'], { windowsHide: true, timeout: 10000 }, (error, output) => {
+      if (error) { resolve(fallback()); return; }
+      try { const data = JSON.parse(output); const drives = [].concat(data).filter(Boolean).map(d => ({ path: `${d.DeviceID}\\`, label: `${d.VolumeName || 'Local Disk'} (${d.DeviceID})`, total: Number(d.Size), free: Number(d.FreeSpace) })); resolve(drives.length ? drives : fallback()); } catch { resolve(fallback()); }
     }));
+  });
+  ipcMain.handle('startup-root', event => {
+    trusted(event);
+    if (process.argv.includes('--verify')) return false;
+    const argument = process.argv.find(a => a.startsWith('--scan='));
+    const chosen = argument?.slice(7);
+    return chosen && fs.existsSync(chosen) ? chosen : null;
   });
   ipcMain.handle('choose-folder', async event => {
     trusted(event);
@@ -90,8 +99,6 @@ app.whenReady().then(() => {
       require('../scripts/verify.cjs')(window, () => ({ result: scanResult, root })).then(() => app.quit()).catch(error => { console.error(error); app.exit(1); });
       return;
     }
-    const argument = process.argv.find(a => a.startsWith('--scan='));
-    if (argument && fs.existsSync(argument.slice(7))) startScan(argument.slice(7), { hidden: true });
   });
   window.on('closed', () => { if (worker) worker.terminate(); });
 });

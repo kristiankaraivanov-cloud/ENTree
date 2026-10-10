@@ -1,6 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
-const defaults = { theme: 'aurora', accent: '#16d7e5', scale: 100, gap: 1, depth: 3, palette: 'aurora', labels: true, hidden: true };
+const defaults = { theme: 'aurora', accent: '#16d7e5', scale: 100, gap: 1, depth: 3, palette: 'aurora', labels: true, hidden: true, scanLimit: 250000 };
 let settings = { ...defaults };
 try {
  const stored = JSON.parse(localStorage.getItem('entree-settings-v2') || '{}');
@@ -8,6 +8,7 @@ try {
  if (/^#[0-9a-f]{6}$/i.test(stored.accent)) settings.accent = stored.accent;
  for (const [key,min,max] of [['scale',85,120],['gap',0,8],['depth',1,4]]) if (Number.isFinite(stored[key])) settings[key] = Math.max(min,Math.min(max,stored[key]));
  for (const key of ['labels','hidden']) if (typeof stored[key] === 'boolean') settings[key] = stored[key];
+ if ([250000,500000,1000000].includes(stored.scanLimit)) settings.scanLimit = stored.scanLimit;
  if (!localStorage.getItem('entree-eclipse-applied-v1')) Object.assign(settings, { theme:'eclipse', accent:'#ffb454', palette:'eclipse' });
  if (!localStorage.getItem('entree-aurora-background-v1')) settings.theme='aurora';
  if (!localStorage.getItem('entree-ocean-aurora-palette-v1')) Object.assign(settings, { theme:'aurora', accent:'#16d7e5', palette:'aurora' });
@@ -23,7 +24,7 @@ const palettes = {
 const extensions = {
  '.mp4':['MP4 Video File','#168bfa'],'.mkv':['Matroska Video','#168bfa'],'.zip':['Compressed Archive','#ed557d'],'.exe':['Application','#3dafa6'],'.dll':['Application Extension','#99a4ae'],'.vhdx':['Hard Disk Image','#fa6c65'],'.sys':['System File','#84a747'],'.iso':['Disc Image File','#994ef5'],'.7z':['7-Zip Archive','#8152d8'],'.jpg':['JPEG Image','#28a4ae'],'.png':['PNG Image','#67ac40'],'.pdf':['PDF Document','#f4b941'],'.msi':['Windows Installer','#09adef'],'.log':['Text Document','#9e5ae8'],'.json':['JSON File','#ff8c35'],'.dat':['DAT File','#ffbd37'],'.js':['JavaScript Source','#00a69f'],'.ts':['TypeScript Source','#00a69f'],'.py':['Python Source','#00a69f'],'.rs':['Rust Source','#00a69f'],'.md':['Markdown Document','#0aa7d4'],'.txt':['Text Document','#0aa7d4']
 };
-let tree,view,selection,stats,volume,demo=true,scanning=false,fileMode=false,largestMode=false,scanStarted=0,elapsed=0,sortKey='size',sortDirection=-1,extSort='size',extensionFilter=null,zoom=100;
+let tree,view,selection,stats,volume,drives=[],scanReady=false,scanning=false,fileMode=false,largestMode=false,scanStarted=0,elapsed=0,sortKey='size',sortDirection=-1,extSort='size',extensionFilter=null,zoom=100;
 let marked=new Map(),index=new Map(),parents=new Map(),expanded=new Set(),toastTimer,extensionRows=[];
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;}
 function icon(name,cls){const e=el('img',cls);e.src='icons/'+name+'.svg';e.alt='';return e;}
@@ -32,34 +33,29 @@ function toast(message){$('toast').textContent=message;$('toast').hidden=false;c
 function category(n){if(/^windows$/i.test(n.name))return 'system';if(/^(applications|program files)/i.test(n.name))return 'application';if(/\.(mp4|mkv|mov|avi|webm)$/i.test(n.name)||/^videos$/i.test(n.name))return 'video';return n.category||'other';}
 function color(n){return palettes[settings.palette][category(n)]||palettes[settings.palette].other;}
 function ext(n){const match=n.name.match(/\.[^.]+$/);return match?match[0].toLowerCase():'(other)';}
-function sample(){
- const GB=1024**3;
- function leaf(name,size,kind){return {name,size:size*GB,allocated:(size*1.002)*GB,files:1,folders:0,directory:false,category:kind,children:[],modified:Date.UTC(2025,3,26,13,50)};}
- function folder(name,entries,kind){return {name,directory:true,category:kind,children:entries,size:0,allocated:0,files:0,folders:0,modified:Date.UTC(2025,3,26,13,50)};}
- function contents(prefix,size,kind,extension,count=26){const weights=Array.from({length:count},(_,i)=>1+Math.pow(count-i,1.7));const total=weights.reduce((a,b)=>a+b,0);return weights.map((weight,i)=>leaf(prefix+'-'+String(i+1).padStart(2,'0')+extension,size*weight/total,kind));}
- const root=folder('C:\\',[
- folder('Videos',contents('Recording',95.4,'video','.mp4',48),'media'),
- folder('Windows',[...contents('System',70.4,'system','.dll',50),...contents('Disk',11.2,'system','.sys',25),...contents('Resources',10.7,'system','.dat',20)],'other'),
- folder('Applications',contents('Application',58.4,'application','.exe',45),'other'),
- folder('Projects',[folder('ENTree',contents('module',12.1,'code','.js',25),'code'),folder('Workflow automation',contents('workflow',8.4,'code','.json',18),'code'),folder('Design system',contents('component',7.3,'code','.ts',24),'code'),folder('Experiments',contents('experiment',4.3,'code','.py',16),'code')],'code'),
- folder('Images',[...contents('Photo',8.4,'media','.jpg',28),...contents('Artwork',6.1,'media','.png',20)],'media'),
- folder('Downloads',[...contents('Archive',12.1,'downloads','.zip',20),...contents('Installer',5.1,'downloads','.msi',10)],'downloads'),
- folder('Documents',contents('Report',5.8,'documents','.pdf',20),'documents'),
- folder('.cache',contents('Cache',6.4,'cache','.log',25),'cache'),
- folder('Other',contents('Data',22.3,'other','.bin',30),'other')
- ],'other');
- function finish(n,parent){n.path=parent?parent+'\\'+n.name:'C:\\';for(const child of n.children)finish(child,n.path.replace(/\\$/,''));if(n.directory){for(const child of n.children){n.size+=child.size;n.allocated+=child.allocated;n.files+=child.files;n.folders+=child.folders+(child.directory?1:0);}}}
- finish(root,'');return root;
+function showCapacity(){
+ const valid=volume&&Number.isFinite(volume.total)&&Number.isFinite(volume.free)&&volume.total>0;
+ $('volume-used').textContent=valid?bytes(Math.max(0,volume.total-volume.free)):'—';
+ $('volume-free').textContent=valid?bytes(volume.free):'—';$('volume-total').textContent=valid?bytes(volume.total):'—';
+ $('volume-bar').style.width=valid?Math.min(100,Math.max(0,(1-volume.free/volume.total)*100))+'%':'0';
+ const measured=drives.filter(d=>Number.isFinite(d.total)&&Number.isFinite(d.free)&&d.total>0);
+ const total=measured.reduce((sum,d)=>sum+d.total,0),free=measured.reduce((sum,d)=>sum+d.free,0);
+ $('all-disks').textContent=measured.length?'All local disks: '+bytes(free)+' free / '+bytes(total)+' total':'';
 }
-function load(result,isDemo){
- tree=result.tree;stats=result.stats;volume=result.volume;demo=isDemo;view=tree;selection=tree;marked.clear();index.clear();parents.clear();expanded=new Set([tree.path]);extensionFilter=null;largestMode=false;
+function clearResults(message){
+ tree=view=selection=stats=undefined;scanReady=false;marked.clear();index.clear();parents.clear();expanded.clear();extensionFilter=null;largestMode=false;fileMode=false;
+ $('tree-rows').replaceChildren();$('extension-rows').replaceChildren();$('treemap').replaceChildren(el('div','empty',message));$('breadcrumbs').replaceChildren();
+ $('file-count').textContent='';$('elapsed').textContent='';$('search').value='';$('marked-count').textContent='0';$('marked-summary').textContent='';
+ for(const id of ['details','review','largest-files','export-summary','up'])$(id).disabled=true;
+}
+function load(result){
+ tree=result.tree;stats=result.stats;volume=result.volume;scanReady=true;view=tree;selection=tree;marked.clear();index.clear();parents.clear();expanded=new Set([tree.path]);extensionFilter=null;largestMode=false;
  const stack=[tree];while(stack.length){const n=stack.pop();index.set(n.path,n);for(const c of n.children){parents.set(c.path,n);stack.push(c);}}
- if(demo){const projects=tree.children.find(n=>n.name==='Projects');selection=projects||tree;expanded.add(projects.path);elapsed=2.4;}else elapsed=(performance.now()-scanStarted)/1000;
- $('search').value='';$('source-badge').textContent=demo?'DEMO DATA':'LOCAL · PRIVATE';setScanning(false);
- $('status').textContent=demo?'Scan complete · sample data':(stats.truncated?'Partial scan · limit reached':'Scan complete')+(stats.unreadable?' · '+stats.unreadable+' unreadable':'')+(stats.links?' · '+stats.links+' links/mounts skipped':'');
+ elapsed=(performance.now()-scanStarted)/1000;
+ $('search').value='';$('source-badge').textContent=stats.truncated||stats.unreadable||stats.links?'LOCAL · PARTIAL':'LOCAL · PRIVATE';setScanning(false);
+ $('status').textContent=(stats.truncated?'Partial scan · '+settings.scanLimit.toLocaleString()+' entry limit reached · raise it in Settings':'Scan complete')+(stats.unreadable?' · '+stats.unreadable+' unreadable':'')+(stats.links?' · '+stats.links+' links/mounts skipped':'');
  render();
 }
-function showDemo(){if(!scanning){const sampleTree=sample();load({tree:sampleTree,stats:{},volume:{total:500*1024**3,free:500*1024**3-sampleTree.allocated}},true);}}
 function isMarked(n){while(n){if(marked.has(n.path))return true;n=parents.get(n.path);}return false;}
 function go(n){if(!n.directory||scanning)return;view=n;selection=n;expanded.add(n.path);$('search').value='';extensionFilter=null;zoom=100;$('zoom').value=100;render();}
 function up(){const p=parents.get(view.path);if(p)go(p);}
@@ -75,7 +71,7 @@ function render(){
  let chain=[],n=view;$('breadcrumbs').replaceChildren();while(n){chain.unshift(n);n=parents.get(n.path);}chain.forEach((item,i)=>{if(i)$('breadcrumbs').append(el('span','','/'));const b=el('button','',item.name);b.onclick=()=>go(item);$('breadcrumbs').append(b);});
  $('up').disabled=view===tree||scanning;$('tree-tab').classList.toggle('active',!fileMode);$('file-tab').classList.toggle('active',fileMode&&!largestMode);$('largest-files').classList.toggle('active',largestMode);
  $('file-count').textContent=view.files.toLocaleString()+' files';$('elapsed').textContent=elapsed.toFixed(1)+' seconds';
- $('volume-used').textContent=volume?bytes(volume.total-volume.free):'—';$('volume-free').textContent=volume?bytes(volume.free):'—';$('volume-total').textContent=volume?bytes(volume.total):'—';$('volume-bar').style.width=volume&&volume.total?(1-volume.free/volume.total)*100+'%':'0';
+ showCapacity();
  renderTables();renderExtensions();drawMap();renderDetails();renderMarked();
 }
 function sorted(items){return [...items].sort((a,b)=>sortDirection*(sortKey==='name'?a.name.localeCompare(b.name):(a[sortKey]||0)-(b[sortKey]||0)));}
@@ -148,7 +144,7 @@ function renderDetails(){
  $('selection-name').textContent=selection.name;$('selection-path').textContent=selection.path;$('selection-size').textContent=bytes(selection.size);
  $('selection-share').textContent=(view.size?selection.size/view.size*100:0).toFixed(1)+'% of this folder'+(selection.incomplete?' · incomplete scan':'');
  $('selection-type').textContent=selection.directory?'Folder':'File';$('selection-files').textContent=selection.files.toLocaleString();$('selection-date').textContent=new Date(selection.modified).toLocaleString();
- $('explore').disabled=!selection.directory||selection===view||scanning;$('reveal').disabled=demo||scanning;$('mark').disabled=selection===tree||scanning;$('mark').textContent=marked.has(selection.path)?'Remove from review':'Add to review';
+ $('explore').disabled=!selection.directory||selection===view||scanning;$('reveal').disabled=!scanReady||scanning;$('mark').disabled=selection===tree||scanning;$('mark').textContent=marked.has(selection.path)?'Remove from review':'Add to review';
 }
 function applySettings(){
  document.body.classList.toggle('dark',settings.theme==='dark'||settings.theme==='eclipse'||settings.theme==='aurora'||settings.theme==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);
@@ -165,38 +161,59 @@ function applySettings(){
 function renderReview(){
  $('review-items').replaceChildren();for(const n of marked.values()){const row=el('div','review-item'),text=el('div');text.append(el('strong','',n.name),el('small','',n.path),el('em','',bytes(n.size)));const remove=el('button','','Remove');remove.onclick=()=>toggleMark(n);row.append(text,remove);$('review-items').append(row);}
  if(!marked.size)$('review-items').append(el('p','','No marked items. Right-click an item for Details, then Add to review; or Ctrl/Cmd-click a tile.'));
- $('review-total').textContent=bytes([...marked.values()].reduce((s,n)=>s+n.size,0))+' in '+marked.size+' item(s)';$('trash').disabled=demo||!marked.size||scanning;$('trash').textContent=demo?'Demo · no files changed':'Move to Trash';$('export').disabled=!marked.size;
+ $('review-total').textContent=bytes([...marked.values()].reduce((s,n)=>s+n.size,0))+' in '+marked.size+' item(s)';$('trash').disabled=!scanReady||!marked.size||scanning;$('trash').textContent='Move to Trash';$('export').disabled=!marked.size;
 }
-function setScanning(value){scanning=value;$('cancel').hidden=!value;for(const id of ['choose','scan','rescan','demo','review','drive','largest-files','export-summary'])$(id).disabled=value;if(tree)renderDetails();}
-async function scanFolder(root){scanStarted=performance.now();setScanning(true);$('status').textContent='Scanning…';marked.clear();renderMarked();try{await window.entree.scan(root,{hidden:settings.hidden});}catch(e){setScanning(false);demo=true;$('source-badge').textContent='PREVIOUS VIEW · READ ONLY';renderDetails();toast(e.message);}}
-$('choose').onclick=async()=>{if(!window.entree){toast('Browser demo: run the desktop app to scan your files.');return;}try{const folder=await window.entree.chooseFolder();if(folder){let option=[...$('drive').options].find(o=>o.value===folder);if(!option){option=el('option','',folder);option.value=folder;$('drive').append(option);}$('drive').value=folder;await scanFolder(folder);}}catch(e){toast(e.message);}};
-$('scan').onclick=()=>{const root=$('drive').value;if(root==='demo')showDemo();else scanFolder(root);};
-$('rescan').onclick=()=>demo?showDemo():scanFolder(tree.path);
-$('cancel').onclick=async()=>{await window.entree.cancel();setScanning(false);demo=true;$('source-badge').textContent='PREVIOUS VIEW · READ ONLY';$('status').textContent='Scan canceled';renderDetails();};
-$('demo').onclick=()=>{$('drive').value='demo';showDemo();};$('up').onclick=up;
-$('details').onclick=()=>{$('details-dialog').showModal();};
+function setScanning(value){scanning=value;$('cancel').hidden=!value;for(const id of ['scan','rescan','drive'])$(id).disabled=value;for(const id of ['review','largest-files','export-summary','details'])$(id).disabled=value||!scanReady;$('choose').disabled=false;if(tree)renderDetails();}
+async function scanFolder(root){
+ if(!window.entree||!root)return;
+ scanStarted=performance.now();clearResults('Scanning real files on '+root+'…');setScanning(true);$('source-badge').textContent='SCANNING LOCAL FILES';$('status').textContent='Scanning '+root+'…';
+ try{await window.entree.scan(root,{hidden:settings.hidden,maxEntries:settings.scanLimit});}catch(e){setScanning(false);$('source-badge').textContent='SCAN FAILED';$('status').textContent='Scan failed';$('treemap').replaceChildren(el('div','empty','Scan failed. Choose a folder or try again.'));toast(e.message);}
+}
+$('choose').onclick=async()=>{if(!window.entree){toast('Run the desktop app to scan your files.');return;}try{const folder=await window.entree.chooseFolder();if(folder){let option=[...$('drive').options].find(o=>o.value===folder);if(!option){option=el('option','',folder);option.value=folder;$('drive').append(option);}$('drive').value=folder;const matching=drives.find(d=>folder.toLowerCase().startsWith(d.path.toLowerCase()));volume=matching?{total:matching.total,free:matching.free}:null;showCapacity();await scanFolder(folder);}}catch(e){toast(e.message);}};
+$('scan').onclick=()=>scanFolder($('drive').value);
+$('rescan').onclick=()=>scanFolder(tree?.path||$('drive').value);
+$('cancel').onclick=async()=>{await window.entree.cancel();setScanning(false);$('source-badge').textContent='SCAN CANCELED';$('status').textContent='Scan canceled';$('treemap').replaceChildren(el('div','empty','Scan canceled. Press Scan to start again.'));};
+$('up').onclick=up;
+$('details').onclick=()=>{if(selection)$('details-dialog').showModal();};
 $('explore').onclick=()=>{$('details-dialog').close();go(selection);};
 $('reveal').onclick=async()=>{try{await window.entree.reveal(selection.path);}catch(e){toast(e.message);}};
 $('mark').onclick=()=>toggleMark();
 $('settings').onclick=()=>$('settings-dialog').showModal();
-$('review').onclick=()=>{renderReview();$('review-dialog').showModal();};
+$('review').onclick=()=>{if(!tree)return;renderReview();$('review-dialog').showModal();};
 document.querySelectorAll('.close-dialog').forEach(b=>b.onclick=()=>b.closest('dialog').close());
-$('tree-tab').onclick=()=>{fileMode=false;largestMode=false;extensionFilter=null;render();};$('file-tab').onclick=()=>{fileMode=true;largestMode=false;extensionFilter=null;render();};
-$('largest-files').onclick=()=>{largestMode=!largestMode;fileMode=largestMode;extensionFilter=null;sortKey='size';sortDirection=-1;$('status').textContent=largestMode?'Top 25 largest files · '+(demo?'sample data':'local scan'):'Scan complete';render();};
+$('tree-tab').onclick=()=>{if(!tree)return;fileMode=false;largestMode=false;extensionFilter=null;render();};$('file-tab').onclick=()=>{if(!tree)return;fileMode=true;largestMode=false;extensionFilter=null;render();};
+$('largest-files').onclick=()=>{if(!tree)return;largestMode=!largestMode;fileMode=largestMode;extensionFilter=null;sortKey='size';sortDirection=-1;$('status').textContent=largestMode?'Top 25 largest files · local scan':'Scan complete';render();};
 document.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{sortDirection=sortKey===b.dataset.sort?-sortDirection:-1;sortKey=b.dataset.sort;renderTables();});
 document.querySelectorAll('[data-ext-sort]').forEach(b=>b.onclick=()=>{extSort=b.dataset.extSort;renderExtensions();});
-$('search').oninput=()=>{renderTables();drawMap();};
- for(const key of Object.keys(defaults))$(key).oninput=()=>{const c=$(key);settings[key]=c.type==='checkbox'?c.checked:['scale','gap','depth'].includes(key)?Number(c.value):c.value;if(key==='theme'&&settings.theme==='eclipse'){settings.accent='#ffb454';settings.palette='eclipse';}else if(key==='theme'&&settings.theme==='aurora'){settings.accent='#16d7e5';settings.palette='aurora';}applySettings();};
+$('search').oninput=()=>{if(tree){renderTables();drawMap();}};
+for(const key of Object.keys(defaults))$(key).oninput=()=>{const c=$(key);settings[key]=c.type==='checkbox'?c.checked:['scale','gap','depth','scanLimit'].includes(key)?Number(c.value):c.value;if(key==='theme'&&settings.theme==='eclipse'){settings.accent='#ffb454';settings.palette='eclipse';}else if(key==='theme'&&settings.theme==='aurora'){settings.accent='#16d7e5';settings.palette='aurora';}applySettings();};
 $('reset-settings').onclick=()=>{settings={...defaults};applySettings();};
 function changeZoom(value){zoom=Math.min(300,Math.max(100,value));$('zoom').value=zoom;drawMap();}
 $('zoom').oninput=()=>changeZoom(Number($('zoom').value));$('zoom-out').onclick=()=>changeZoom(zoom-20);$('zoom-in').onclick=()=>changeZoom(zoom+20);$('fit').onclick=()=>changeZoom(100);
-$('export').onclick=()=>{const data=JSON.stringify({app:'ENTree',generated:new Date().toISOString(),root:tree.path,demo,items:[...marked.values()].map(n=>({path:n.path,apparentBytes:n.size}))},null,2),url=URL.createObjectURL(new Blob([data],{type:'application/json'})),a=el('a');a.href=url;a.download='entree-review.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
- $('export-summary').onclick=()=>{if(!tree)return;const files=allFiles(tree),byCategory={};for(const n of files){const key=category(n);byCategory[key]=(byCategory[key]||0)+n.size;}const summary={app:'ENTree',generated:new Date().toISOString(),source:demo?'sample demo data — not a live PC scan':'local scan',root:tree.path,totals:{files:tree.files,folders:tree.folders,apparentBytes:tree.size,allocatedBytes:tree.allocated,volumeBytes:volume?.total??null,freeBytes:volume?.free??null},scanStats:stats,categories:byCategory,largestFiles:[...files].sort((a,b)=>b.size-a.size||a.name.localeCompare(b.name)).slice(0,25).map(n=>({name:n.name,path:n.path,apparentBytes:n.size,category:category(n)}))};const url=URL.createObjectURL(new Blob([JSON.stringify(summary,null,2)],{type:'application/json'})),a=el('a');a.href=url;a.download='entree-scan-summary.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Scan summary exported. '+(demo?'Sample data is labeled in the file.':'Local scan data stays on this device.'));};
-$('trash').onclick=async()=>{if(demo||!marked.size)return;$('trash').disabled=true;try{const result=await window.entree.trash([...marked.keys()]);if(result.canceled){renderReview();return;}$('review-dialog').close();toast(result.errors?.length?result.moved+' moved. '+result.errors.map(e=>e.path+': '+e.message).join('; '):result.moved+' item(s) moved to Trash.');await scanFolder(tree.path);}catch(e){toast(e.message);renderReview();}};
+$('export').onclick=()=>{const data=JSON.stringify({app:'ENTree',generated:new Date().toISOString(),root:tree.path,source:'local scan',items:[...marked.values()].map(n=>({path:n.path,apparentBytes:n.size}))},null,2),url=URL.createObjectURL(new Blob([data],{type:'application/json'})),a=el('a');a.href=url;a.download='entree-review.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+ $('export-summary').onclick=()=>{if(!tree)return;const files=allFiles(tree),byCategory={};for(const n of files){const key=category(n);byCategory[key]=(byCategory[key]||0)+n.size;}const summary={app:'ENTree',generated:new Date().toISOString(),source:'local scan',root:tree.path,totals:{files:tree.files,folders:tree.folders,apparentBytes:tree.size,allocatedBytes:tree.allocated,volumeBytes:volume?.total??null,freeBytes:volume?.free??null},localDisks:drives.map(d=>({path:d.path,totalBytes:d.total,freeBytes:d.free})),scanStats:stats,categories:byCategory,largestFiles:[...files].sort((a,b)=>b.size-a.size||a.name.localeCompare(b.name)).slice(0,25).map(n=>({name:n.name,path:n.path,apparentBytes:n.size,category:category(n)}))};const url=URL.createObjectURL(new Blob([JSON.stringify(summary,null,2)],{type:'application/json'})),a=el('a');a.href=url;a.download='entree-scan-summary.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Local scan summary exported.');};
+$('trash').onclick=async()=>{if(!scanReady||!marked.size)return;$('trash').disabled=true;try{const scannedRoot=tree.path;const result=await window.entree.trash([...marked.keys()]);if(result.canceled){renderReview();return;}$('review-dialog').close();toast(result.errors?.length?result.moved+' moved. '+result.errors.map(e=>e.path+': '+e.message).join('; '):result.moved+' item(s) moved to Trash.');await scanFolder(scannedRoot);}catch(e){toast(e.message);renderReview();}};
 document.querySelectorAll('[data-window]').forEach(b=>b.onclick=()=>window.entree?window.entree.windowControl(b.dataset.window):toast('Window controls are available in the desktop app.'));
 document.addEventListener('keydown',e=>{if(e.target.matches('input,select')||document.querySelector('dialog[open]'))return;if(e.key==='Escape'||e.key==='Backspace'){e.preventDefault();up();}if(e.key==='Enter'){e.preventDefault();go(selection);}if(e.key===' '){e.preventDefault();toggleMark();}});
-if(window.entree){window.entree.onScan(msg=>{if(msg.type==='progress')$('status').textContent='Scanning · '+msg.entries.toLocaleString()+' entries…';else if(msg.type==='complete')load(msg.result,false);else if(msg.type==='error'){setScanning(false);demo=true;$('source-badge').textContent='PREVIOUS VIEW · READ ONLY';$('status').textContent='Scan failed';renderDetails();toast(msg.message);}});window.entree.drives().then(drives=>{for(const d of drives){const option=el('option','',d.label);option.value=d.path;$('drive').append(option);}}).catch(()=>toast('Drive list unavailable. Use Open folder.'));}
+if(window.entree){
+ window.entree.onScan(msg=>{
+  if(msg.type==='progress')$('status').textContent='Scanning · '+msg.entries.toLocaleString()+' entries…';
+  else if(msg.type==='complete'){load(msg.result);window.entree.drives().then(found=>{drives=found;showCapacity();}).catch(()=>{});}
+  else if(msg.type==='error'){setScanning(false);$('source-badge').textContent='SCAN FAILED';$('status').textContent='Scan failed';$('treemap').replaceChildren(el('div','empty','Scan failed. Choose a folder or try again.'));toast(msg.message);}
+ });
+ window.entree.drives().then(async found=>{
+  drives=found;$('drive').replaceChildren();for(const d of drives){const option=el('option','',d.label);option.value=d.path;$('drive').append(option);}
+  const requested=await window.entree.startupRoot();const chosen=requested||drives.find(d=>d.path.toLowerCase()==='c:\\')?.path||drives[0]?.path;
+  if(!chosen){$('source-badge').textContent='NO LOCAL DISKS';$('status').textContent='Choose a folder to scan';return;}
+  if(![...$('drive').options].some(o=>o.value===chosen)){const option=el('option','',chosen);option.value=chosen;$('drive').append(option);}
+  $('drive').value=chosen;const matching=drives.find(d=>chosen.toLowerCase().startsWith(d.path.toLowerCase()));volume=matching?{total:matching.total,free:matching.free}:null;showCapacity();
+  $('drive').disabled=false;$('scan').disabled=false;$('rescan').disabled=false;
+  if(requested===false){$('source-badge').textContent='READY TO SCAN';$('status').textContent='Ready to scan '+chosen;return;}
+  await scanFolder(chosen);
+ }).catch(error=>{$('source-badge').textContent='DRIVE LIST UNAVAILABLE';$('status').textContent='Choose a folder to scan';toast(error.message);});
+ $('drive').onchange=()=>{const chosen=$('drive').value;const matching=drives.find(d=>chosen.toLowerCase().startsWith(d.path.toLowerCase()));volume=matching?{total:matching.total,free:matching.free}:null;showCapacity();clearResults('Press Scan to read '+chosen);$('source-badge').textContent='READY TO SCAN';$('status').textContent='Ready to scan '+chosen;};
+}else{$('source-badge').textContent='DESKTOP APP REQUIRED';$('status').textContent='Run ENTree on your computer to scan files';}
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(settings.theme==='system')applySettings();});
 new ResizeObserver(()=>{if(tree)drawMap();}).observe($('treemap'));
-applySettings();showDemo();
+applySettings();clearResults('Detecting local disks…');showCapacity();
 

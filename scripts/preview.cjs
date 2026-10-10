@@ -8,4 +8,4 @@ http.createServer((req, res) => {
   const content = fs.readFileSync(path.join(base, name));
   res.setHeader('Content-Type', name.endsWith('.svg') ? 'image/svg+xml' : name.endsWith('.js') ? 'text/javascript' : name.endsWith('.css') ? 'text/css' : 'text/html');
   res.end(content);
-}).listen(4173, '127.0.0.1', () => console.log('ENtree demo preview: http://127.0.0.1:4173'));
+}).listen(4173, '127.0.0.1', () => console.log('ENTree UI preview (desktop app required for scanning): http://127.0.0.1:4173'));

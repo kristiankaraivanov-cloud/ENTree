@@ -59,6 +59,9 @@ body.aurora .tile{border-color:#10091e9c}
 body.aurora .tile.selected{outline-color:#32e1e7;box-shadow:inset 0 0 0 5px #20cad455}
 body.aurora .tile.marked{outline-color:#e879d4}
 body.aurora .statusbar>img{filter:invert(79%) sepia(74%) saturate(560%) hue-rotate(124deg)}
+#all-disks{margin-left:auto;white-space:nowrap;color:var(--muted)}
+#all-disks:empty{display:none}
+@media(max-width:1050px){#all-disks{font-size:10px}}
 body.aurora dialog{background:#1b1230f5;border-color:#61457f}
 body.aurora dialog::backdrop{background:#070411a8}
 body.aurora .setting-row{border-color:#49345f}
