@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { scan, validateTrash, inside } = require('../src/scanner.cjs');
-function fixture(t) { const root = fs.mkdtempSync(path.join(os.tmpdir(), 'entree-test-')); t.after(() => fs.rmSync(root, { recursive: true, force: true })); return root; }
+function fixture(t) { const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'entree-test-'))); t.after(() => fs.rmSync(root, { recursive: true, force: true })); return root; }
 test('real file sizes, nested aggregation, empty folders and dot-file exclusion', t => {
   const root = fixture(t); fs.mkdirSync(path.join(root, 'src')); fs.mkdirSync(path.join(root, 'empty'));
   fs.writeFileSync(path.join(root, 'src', 'app.js'), '12345'); fs.writeFileSync(path.join(root, '.hidden'), '123'); fs.writeFileSync(path.join(root, 'zero'), '');
