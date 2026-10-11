@@ -5,6 +5,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { scan, validateTrash, inside } = require('../src/scanner.cjs');
 function fixture(t) { const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'entree-test-'))); t.after(() => fs.rmSync(root, { recursive: true, force: true })); return root; }
+// CI temp folders may live outside the runner's home; keep fixture trash tests independent of that layout.
+function validateFixtureTrash(root, target, manifest) { return validateTrash(root, target, manifest, path.dirname(root)); }
 test('real file sizes, nested aggregation, empty folders and dot-file exclusion', t => {
   const root = fixture(t); fs.mkdirSync(path.join(root, 'src')); fs.mkdirSync(path.join(root, 'empty'));
   fs.writeFileSync(path.join(root, 'src', 'app.js'), '12345'); fs.writeFileSync(path.join(root, '.hidden'), '123'); fs.writeFileSync(path.join(root, 'zero'), '');
@@ -22,7 +24,7 @@ test('directory links are skipped and linked parents cannot be recycled', t => {
   fs.writeFileSync(path.join(root, 'actual', 'file'), '123');
   fs.symlinkSync(path.join(root, 'actual'), path.join(root, 'folder', 'link'), process.platform === 'win32' ? 'junction' : 'dir');
   const result = scan(root); assert.equal(result.stats.links, 1); assert.equal(result.tree.size, 3);
-  assert.throws(() => validateTrash(result.tree.path, path.join(root, 'folder'), new Map(result.manifest)), /links/);
+  assert.throws(() => validateFixtureTrash(result.tree.path, path.join(root, 'folder'), new Map(result.manifest)), /links/);
 });
 test('entry limits are explicit partial results and unsafe to recycle', t => {
   const root = fixture(t); for (let i = 0; i < 10; i++) fs.writeFileSync(path.join(root, `${i}`), 'x');
@@ -31,16 +33,16 @@ test('entry limits are explicit partial results and unsafe to recycle', t => {
 test('trash validates scanned identity, changed files, root and outside paths', t => {
   const root = fixture(t); const file = path.join(root, 'test.txt'); fs.writeFileSync(file, '123');
   const result = scan(root); const manifest = new Map(result.manifest);
-  assert.equal(validateTrash(result.tree.path, file, manifest), file);
-  assert.throws(() => validateTrash(root, root, manifest), /scan root/);
-  assert.throws(() => validateTrash(root, path.dirname(root), manifest), /outside/);
-  fs.writeFileSync(file, '123456'); assert.throws(() => validateTrash(root, file, manifest), /changed/);
+  assert.equal(validateFixtureTrash(result.tree.path, file, manifest), file);
+  assert.throws(() => validateFixtureTrash(root, root, manifest), /scan root/);
+  assert.throws(() => validateFixtureTrash(root, path.dirname(root), manifest), /outside/);
+  fs.writeFileSync(file, '123456'); assert.throws(() => validateFixtureTrash(root, file, manifest), /changed/);
 });
 test('a scanned path replaced by a junction is rejected', t => {
   const root = fixture(t); const folder = path.join(root, 'folder'); const outside = path.join(root, 'elsewhere');
   fs.mkdirSync(folder); fs.mkdirSync(outside); const result = scan(root);
   fs.rmdirSync(folder); fs.symlinkSync(outside, folder, process.platform === 'win32' ? 'junction' : 'dir');
-  assert.throws(() => validateTrash(root, folder, new Map(result.manifest)), /Linked/);
+  assert.throws(() => validateFixtureTrash(root, folder, new Map(result.manifest)), /Linked/);
 });
 test('home directory protection and strict containment', t => {
   const root = fixture(t); const home = path.join(root, 'home'); fs.mkdirSync(home); const result = scan(root);
@@ -54,12 +56,12 @@ test('Windows system paths are protected regardless of casing', { skip: process.
 test('excluded hidden contents prevent recycling their containing folder', t => {
   const root = fixture(t); const folder = path.join(root, 'folder'); fs.mkdirSync(folder); fs.writeFileSync(path.join(folder, '.secret'), '123');
   const result = scan(root, { hidden: false });
-  assert.throws(() => validateTrash(root, folder, new Map(result.manifest)), /excluded entries/);
+  assert.throws(() => validateFixtureTrash(root, folder, new Map(result.manifest)), /excluded entries/);
 });
 test('a changed descendant is rejected even if its parent directory is unchanged', t => {
   const root = fixture(t); const folder = path.join(root, 'folder'); fs.mkdirSync(folder); const file = path.join(folder, 'file'); fs.writeFileSync(file, '123');
   const result = scan(root); fs.writeFileSync(file, '123456789');
-  assert.throws(() => validateTrash(root, folder, new Map(result.manifest)), /contents changed/);
+  assert.throws(() => validateFixtureTrash(root, folder, new Map(result.manifest)), /contents changed/);
 });
 test('allocated storage and descendant folder counts aggregate correctly', t => {
   const root = fixture(t); fs.mkdirSync(path.join(root, 'folder')); fs.writeFileSync(path.join(root, 'folder', 'file'), Buffer.alloc(8192));
